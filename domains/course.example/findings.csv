@@ -1,2 +1,3 @@
 Domain,Website,Task,Attempted,Outcome,Date,Details,Contributor
 course.example,app.course.example,Demo assignment tracking,no,not-attempted,2026-09-26,Fictional domain; no real access attempted. Form and GitHub storage test.,Codex QA
+course.example,manual.course.example,GitHub direct edit demonstration,no,not-attempted,2026-09-26,No real access attempted; direct contributor workflow test.,Codex QA
