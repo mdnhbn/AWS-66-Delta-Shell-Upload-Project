@@ -1,34 +1,36 @@
 # Contributing | অবদান রাখার গাইড
 
-এই repository-তে শুধু অনুমোদিত training lab-এর তথ্য যোগ করুন। বাস্তব website URL, admin username/password, shell URL, payload বা sensitive screenshot commit করবেন না।
+শুধু course-এর লিখিত অনুমতিপ্রাপ্ত domain ও website hostname নথিভুক্ত করুন। Repository public: credentials, URL path, shell URL, payload, exploit instructions, personal data বা sensitive screenshot commit করবেন না। Confidential hostname হলে public repository-তে লিখবেন না।
 
-## Dashboard method | Dashboard থেকে
+## Dashboard থেকে
 
-1. Vercel dashboard খুলুন এবং **নতুন Entry** ট্যাবে যান।
-2. Country, opaque Lab ID, finding status, date, contributor এবং সংক্ষিপ্ত safe note দিন।
-3. Team lead-এর দেওয়া submission key লিখে Submit করুন। Successful message দেখলে Dashboard refresh করে row যাচাই করুন।
+1. Live dashboard-এ **নতুন Entry** খুলুন। Assigned domain (যেমন `example.org`) এবং সেই domain-এর website hostname (যেমন `app.example.org`) লিখুন। `https://`, slash ও path লিখবেন না।
+2. Assigned task, চেষ্টা করেছেন কি না, ফলাফল, তারিখ, সংক্ষিপ্ত নিরাপদ details এবং contributor নাম দিন। সফল না হলেও entry করুন। `Attempted=no` হলে `Outcome=not-attempted` দিন।
+3. Team lead-এর submission key দিয়ে submit করুন। Dashboard-এ row এবং GitHub-এর `domains/<domain>/findings.csv` যাচাই করুন।
 
-## GitHub browser method | Browser থেকে
+## GitHub browser থেকে
 
-1. `domains/[country]/findings.csv` খুলে pencil icon চাপুন।
-2. Header অনুসারে একটি CSV row যোগ করুন। Comma বা quote থাকলে field-টি double quotes-এ রাখুন এবং ভেতরের quote দ্বিগুণ করুন।
-3. **Commit changes** বা branch + pull request নির্বাচন করুন।
+1. Contributor access থাকলে `domains/<domain>/findings.csv` খুলুন। ফাইল না থাকলে সেই path-এ **Add file → Create new file** দিয়ে নিচের header লিখুন।
+2. Header অনুসারে row যোগ করুন। Comma বা quote থাকলে CSV field double quote-এ রাখুন এবং ভেতরের quote দ্বিগুণ করুন। Domain folder ও `Domain` কলাম একই হতে হবে। Website সেই domain বা subdomain হতে হবে।
+3. **Commit changes** বা branch + pull request দিন। নতুন domain file-ও dashboard-এ আসবে।
 
-## Command line method
+```csv
+Domain,Website,Task,Attempted,Outcome,Date,Details,Contributor
+example.org,app.example.org,Authorized course check,yes,unsuccessful,2026-09-26,No result during scheduled practice,Your Name
+```
+
+`Outcome`: `success`, `unsuccessful`, `in-progress`, `not-attempted`. একই website/task/date/contributor combination আবার যোগ করবেন না। GitHub direct edit-এ API validation চলে না, তাই header, CSV formatting, scope ও নিরাপদ content নিজে যাচাই করুন।
+
+## Command line
 
 ```bash
 git clone https://github.com/mdnhbn/AWS-66-Delta-Shell-Upload-Project.git
 cd AWS-66-Delta-Shell-Upload-Project
-git checkout -b findings/my-lab
-# Edit domains/<country>/findings.csv
-git add domains/<country>/findings.csv
-git commit -m "[country] Document authorized lab finding"
-git push origin findings/my-lab
+git checkout -b findings/example-org
+# Edit or create domains/example.org/findings.csv
+git add domains/example.org/findings.csv
+git commit -m "[example.org] Record authorized course task"
+git push origin findings/example-org
 ```
 
-Then open a pull request.
-
-CSV header: `Lab ID,Country,Upload Point,Admin Access,Upload Attempted,Upload Result,Date Found,Notes,Contributor`.
-Status values: `yes`, `no`, `in-progress`. Keep notes generic and free of exploitable details.
-
-Before commit: check authorization, correct country/date, no duplicate lab ID in that country, no credential or real target, and no sensitive evidence.
+তারপর pull request খুলুন। আগের country-based lab CSV files historical data হিসেবে রাখা হয়েছে।
