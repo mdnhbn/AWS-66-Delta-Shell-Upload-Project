@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { session, sameOrigin } from '../lib/auth.js';
 
 const COUNTRIES = ['india', 'pakistan', 'uganda', 'canada', 'others'];
 const HEADERS = ['Domain', 'Website', 'Task', 'Attempted', 'Outcome', 'Date', 'Details', 'Contributor'];
@@ -32,14 +33,14 @@ function entries(content, headers = HEADERS) {
   if (rows[0]?.join(',') !== headers.join(',')) throw new Error('Unexpected CSV header');
   return rows.slice(1).filter(r => r.some(Boolean)).map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
 }
-async function github(path, options = {}) {
+async function github(path, options = {}, userToken = '') {
   const owner = process.env.GITHUB_OWNER || 'mdnhbn';
   const repo = process.env.GITHUB_REPO || 'AWS-66-Delta-Shell-Upload-Project';
   const response = await fetch(`${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`, {
     ...options, headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+      ...(userToken ? { Authorization: `Bearer ${userToken}` } : {}),
       ...options.headers
     }
   });
@@ -90,29 +91,30 @@ export default async function handler(req, res) {
     } catch { return res.status(503).json({ error: 'Could not load GitHub data' }); }
   }
   if (req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return res.status(405).json({ error: 'Method not allowed' }); }
-  if (!process.env.GITHUB_TOKEN || !process.env.SUBMISSION_KEY) return res.status(503).json({ error: 'Submission is not configured' });
-  if (typeof req.headers['x-submission-key'] !== 'string' || req.headers['x-submission-key'] !== process.env.SUBMISSION_KEY)
-    return res.status(401).json({ error: 'Invalid submission key' });
+  if (!sameOrigin(req)) return res.status(403).json({ error: 'Invalid origin' });
+  const actor = session(req);
+  if (!actor) return res.status(401).json({ error: 'Sign in with GitHub to contribute' });
   try {
     if (Number(req.headers['content-length'] || 0) > 4096) return res.status(413).json({ error: 'Entry too large' });
-    const entry = validate(req.body);
+    const entry = validate({ ...req.body, Contributor: actor.login });
     const path = `domains/${encodeURIComponent(entry.Domain)}/findings.csv`;
     for (let attempt = 0; attempt < 3; attempt++) {
       let file, current;
-      try { file = await github(path); current = decode(file); }
+      try { file = await github(path, {}, actor.token); current = decode(file); }
       catch (error) { if (error.status !== 404) throw error; current = csvLine(HEADERS); }
       if (entries(current).some(e => e.Website === entry.Website && e.Task === entry.Task && e.Date === entry.Date && e.Contributor === entry.Contributor))
         return res.status(409).json({ error: 'This website/task/date/contributor entry already exists' });
       const next = current.replace(/\s*$/, '') + '\n' + csvLine(HEADERS.map(h => entry[h]));
       try {
         await github(path, { method: 'PUT', body: JSON.stringify({
-          message: `[${entry.Domain}] Record ${entry.Website} outcome`,
+          message: `[${entry.Domain}] ${actor.login} records ${entry.Website} outcome`,
           content: Buffer.from(next).toString('base64'), ...(file ? { sha: file.sha } : {})
-        }), headers: { 'Content-Type': 'application/json' } });
+        }), headers: { 'Content-Type': 'application/json' } }, actor.token);
         return res.status(201).json({ entry });
       } catch (error) { if (![409, 422].includes(error.status) || attempt === 2) throw error; }
     }
   } catch (error) {
+    if (error.status === 403 || error.status === 404) return res.status(403).json({ error: 'Your GitHub account needs contributor access and the app must be installed for this repository' });
     if (error.status) return res.status(502).json({ error: 'GitHub write failed' });
     return res.status(400).json({ error: error.message });
   }
