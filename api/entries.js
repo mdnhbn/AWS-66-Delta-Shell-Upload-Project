@@ -1,8 +1,8 @@
 import { Buffer } from 'node:buffer';
 
 const COUNTRIES = ['india', 'pakistan', 'uganda', 'canada', 'others'];
-const HEADERS = ['Lab ID', 'Country', 'Upload Point', 'Admin Access', 'Upload Attempted', 'Upload Result', 'Date Found', 'Notes', 'Contributor'];
-const STATUS = ['yes', 'no', 'in-progress'];
+const HEADERS = ['Domain', 'Website', 'Task', 'Attempted', 'Outcome', 'Date', 'Details', 'Contributor'];
+const LEGACY_HEADERS = ['Lab ID', 'Country', 'Upload Point', 'Admin Access', 'Upload Attempted', 'Upload Result', 'Date Found', 'Notes', 'Contributor'];
 const API = 'https://api.github.com';
 
 function csvParse(input) {
@@ -22,18 +22,16 @@ function csvParse(input) {
   if (cell || row.length) { row.push(cell.replace(/\r$/, '')); rows.push(row); }
   return rows;
 }
-
 function csvCell(value) {
   const s = String(value);
   return /[",\r\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
 }
 function csvLine(values) { return values.map(csvCell).join(',') + '\n'; }
-function entries(content) {
+function entries(content, headers = HEADERS) {
   const rows = csvParse(content);
-  if (rows[0]?.join(',') !== HEADERS.join(',')) throw new Error('Unexpected CSV header');
-  return rows.slice(1).filter(r => r.some(Boolean)).map(r => Object.fromEntries(HEADERS.map((h, i) => [h, r[i] ?? ''])));
+  if (rows[0]?.join(',') !== headers.join(',')) throw new Error('Unexpected CSV header');
+  return rows.slice(1).filter(r => r.some(Boolean)).map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
 }
-
 async function github(path, options = {}) {
   const owner = process.env.GITHUB_OWNER || 'mdnhbn';
   const repo = process.env.GITHUB_REPO || 'AWS-66-Delta-Shell-Upload-Project';
@@ -52,60 +50,71 @@ async function github(path, options = {}) {
   }
   return body;
 }
-
+function decode(file) { return Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8'); }
+function hostname(value) {
+  return value.length <= 253 && value.includes('.') && value.split('.').every(label =>
+    label.length > 0 && label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label));
+}
 function validate(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid entry');
   const data = Object.fromEntries(HEADERS.map(h => [h, raw[h]]));
   for (const h of HEADERS) if (typeof data[h] !== 'string') throw new Error(`Missing ${h}`);
   for (const h of HEADERS) data[h] = data[h].trim();
-  if (!COUNTRIES.includes(data.Country)) throw new Error('Invalid country');
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,63}$/.test(data['Lab ID'])) throw new Error('Use an opaque lab ID (3–64 letters, numbers, _ or -)');
-  for (const h of ['Upload Point', 'Admin Access', 'Upload Attempted', 'Upload Result'])
-    if (!STATUS.includes(data[h])) throw new Error(`Invalid ${h}`);
-  const date = data['Date Found'];
+  data.Domain = data.Domain.toLowerCase(); data.Website = data.Website.toLowerCase();
+  if (!hostname(data.Domain) || !hostname(data.Website) || (data.Website !== data.Domain && !data.Website.endsWith(`.${data.Domain}`)))
+    throw new Error('Use a domain and a website hostname within it (without URL path)');
+  if (!data.Task || data.Task.length > 120 || /[\r\n<>]/.test(data.Task)) throw new Error('Invalid task');
+  if (!['yes', 'no'].includes(data.Attempted)) throw new Error('Invalid Attempted');
+  if (!['success', 'unsuccessful', 'in-progress', 'not-attempted'].includes(data.Outcome)) throw new Error('Invalid Outcome');
+  if ((data.Attempted === 'no') !== (data.Outcome === 'not-attempted')) throw new Error('Attempted and outcome do not match');
+  const date = data.Date;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('Invalid date');
   if (!data.Contributor || data.Contributor.length > 60 || /[\r\n<>]/.test(data.Contributor)) throw new Error('Invalid contributor');
-  if (data.Notes.length > 240 || /[\r\n<>]/.test(data.Notes)) throw new Error('Invalid notes');
-  if (/(https?:\/\/|www\.|@|password|passwd|token|secret|\.php\b|\/uploads\/)/i.test(data.Notes)) throw new Error('Remove URLs, credentials and exploit details from notes');
+  if (data.Details.length > 500 || /[\r\n<>]/.test(data.Details)) throw new Error('Invalid details');
+  if (/(https?:\/\/|www\.|@|password|passwd|token|secret|\.php\b|\/uploads\/)/i.test(`${data.Task} ${data.Details}`))
+    throw new Error('Remove URLs, credentials and exploit details from task/details');
   return data;
 }
-
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'GET') {
     try {
-      const all = await Promise.all(COUNTRIES.map(async c => {
-        const file = await github(`domains/${c}/findings.csv`);
-        return entries(Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8'));
-      }));
-      return res.status(200).json({ entries: all.flat() });
+      const directory = await github('domains');
+      if (!Array.isArray(directory)) throw new Error('Missing domain directory');
+      const siteNames = directory.filter(item => item.type === 'dir' && hostname(item.name) && !COUNTRIES.includes(item.name)).map(item => item.name);
+      const [siteRows, legacyRows] = await Promise.all([
+        Promise.all(siteNames.map(async domain => entries(decode(await github(`domains/${encodeURIComponent(domain)}/findings.csv`))))),
+        Promise.all(COUNTRIES.map(async country => entries(decode(await github(`domains/${country}/findings.csv`)), LEGACY_HEADERS)))
+      ]);
+      return res.status(200).json({ entries: siteRows.flat(), legacyEntries: legacyRows.flat() });
     } catch { return res.status(503).json({ error: 'Could not load GitHub data' }); }
   }
   if (req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return res.status(405).json({ error: 'Method not allowed' }); }
   if (!process.env.GITHUB_TOKEN || !process.env.SUBMISSION_KEY) return res.status(503).json({ error: 'Submission is not configured' });
-  const supplied = req.headers['x-submission-key'];
-  if (typeof supplied !== 'string' || supplied !== process.env.SUBMISSION_KEY) return res.status(401).json({ error: 'Invalid submission key' });
+  if (typeof req.headers['x-submission-key'] !== 'string' || req.headers['x-submission-key'] !== process.env.SUBMISSION_KEY)
+    return res.status(401).json({ error: 'Invalid submission key' });
   try {
     if (Number(req.headers['content-length'] || 0) > 4096) return res.status(413).json({ error: 'Entry too large' });
     const entry = validate(req.body);
-    const path = `domains/${entry.Country}/findings.csv`;
+    const path = `domains/${encodeURIComponent(entry.Domain)}/findings.csv`;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const file = await github(path);
-      const current = Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8');
-      if (entries(current).some(e => e['Lab ID'].toLowerCase() === entry['Lab ID'].toLowerCase())) return res.status(409).json({ error: 'Lab ID already exists in this country' });
+      let file, current;
+      try { file = await github(path); current = decode(file); }
+      catch (error) { if (error.status !== 404) throw error; current = csvLine(HEADERS); }
+      if (entries(current).some(e => e.Website === entry.Website && e.Task === entry.Task && e.Date === entry.Date && e.Contributor === entry.Contributor))
+        return res.status(409).json({ error: 'This website/task/date/contributor entry already exists' });
       const next = current.replace(/\s*$/, '') + '\n' + csvLine(HEADERS.map(h => entry[h]));
       try {
         await github(path, { method: 'PUT', body: JSON.stringify({
-          message: `[${entry.Country}] Add lab ${entry['Lab ID']}`,
-          content: Buffer.from(next).toString('base64'), sha: file.sha
+          message: `[${entry.Domain}] Record ${entry.Website} outcome`,
+          content: Buffer.from(next).toString('base64'), ...(file ? { sha: file.sha } : {})
         }), headers: { 'Content-Type': 'application/json' } });
         return res.status(201).json({ entry });
-      } catch (error) { if (error.status !== 409 || attempt === 2) throw error; }
+      } catch (error) { if (![409, 422].includes(error.status) || attempt === 2) throw error; }
     }
   } catch (error) {
     if (error.status) return res.status(502).json({ error: 'GitHub write failed' });
     return res.status(400).json({ error: error.message });
   }
 }
-
 export { csvParse, csvLine, entries, validate };
