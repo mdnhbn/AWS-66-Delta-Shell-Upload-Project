@@ -6,7 +6,7 @@
 
 1. Live dashboard-এ **নতুন Entry** খুলুন। Assigned domain (যেমন `example.org`) এবং সেই domain-এর website hostname (যেমন `app.example.org`) লিখুন। `https://`, slash ও path লিখবেন না।
 2. Assigned task, চেষ্টা করেছেন কি না, ফলাফল, তারিখ, সংক্ষিপ্ত নিরাপদ details এবং contributor নাম দিন। সফল না হলেও entry করুন। `Attempted=no` হলে `Outcome=not-attempted` দিন।
-3. Team lead-এর submission key দিয়ে submit করুন। Dashboard-এ row এবং GitHub-এর `domains/<domain>/findings.csv` যাচাই করুন।
+3. নিজের GitHub ID দিয়ে sign in করে submit করুন। Repository-তে write collaborator access এবং GitHub App অনুমোদন থাকা লাগবে। Dashboard-এ row এবং GitHub-এর `domains/<domain>/findings.csv` যাচাই করুন।
 
 ## GitHub browser থেকে
 
