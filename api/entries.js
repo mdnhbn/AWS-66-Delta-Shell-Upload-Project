@@ -35,8 +35,8 @@ function entries(content) {
 }
 
 async function github(path, options = {}) {
-  const owner = process.env.GITHUB_OWNER, repo = process.env.GITHUB_REPO;
-  if (!owner || !repo) throw new Error('GitHub repository is not configured');
+  const owner = process.env.GITHUB_OWNER || 'mdnhbn';
+  const repo = process.env.GITHUB_REPO || 'AWS-66-Delta-Shell-Upload-Project';
   const response = await fetch(`${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`, {
     ...options, headers: {
       Accept: 'application/vnd.github+json',

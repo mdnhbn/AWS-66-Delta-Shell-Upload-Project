@@ -17,9 +17,9 @@ Only use intentionally vulnerable training labs or systems for which the team ha
 
 1. Import this repository into Vercel. Framework preset: **Other**; root directory: repository root.
 2. Create a fine-grained GitHub token scoped to this repository with **Contents: Read and write**. Store it as `GITHUB_TOKEN` in Vercel environment variables, never in GitHub or the browser.
-3. Set `GITHUB_OWNER`, `GITHUB_REPO` and a long random `SUBMISSION_KEY` in Vercel. Share the submission key only with trusted contributors. Rotate it if exposed.
+3. Set a long random `SUBMISSION_KEY` in Vercel. `GITHUB_OWNER` and `GITHUB_REPO` default to this repository but may be overridden. Share the submission key only with trusted contributors. Rotate it if exposed.
 4. Deploy. Open `/` and verify that the empty dashboard loads. Send a safe test entry and confirm it appears in the corresponding CSV and on refresh.
 
-The GET API reads public repository CSV files from GitHub. The POST API requires `SUBMISSION_KEY`, validates fields, rejects duplicates and retries commit conflicts. For a private repository, `GITHUB_TOKEN` is also required for reads. The token is never returned to clients.
+The GET API reads public repository CSV files from GitHub and works without secrets. The POST API requires `GITHUB_TOKEN` and `SUBMISSION_KEY`, validates fields, rejects duplicates and retries commit conflicts. For a private repository, `GITHUB_TOKEN` is also required for reads. The token is never returned to clients.
 
 Direct GitHub edits and pull requests remain available. Avoid putting secrets in issue bodies, screenshots, commit messages, or Git history.
