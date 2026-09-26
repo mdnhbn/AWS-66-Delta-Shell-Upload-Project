@@ -31,9 +31,9 @@
       <button type="submit">Submit to GitHub</button><p id="form-message" role="status"></p>
     </form>
   </section>
-  <section class="content" id="instructions" hidden><h2>📖 নির্দেশনা</h2><ol><li>Course lead থেকে assigned domain, website এবং লিখিত অনুমতি নিশ্চিত করুন।</li><li>Repository-তে contributor access নিয়ে নিজের GitHub ID দিয়ে লগইন করুন।</li><li>নতুন Entry-তে domain ও website-এর শুধু hostname, task, চেষ্টা, ফলাফল, তারিখ এবং নিরাপদ সারাংশ লিখুন। ব্যর্থ হলেও entry দিন।</li><li>Submit-এর পর dashboard ও GitHub-এর <code>domains/[domain]/findings.csv</code> দেখুন। GitHub-এ সরাসরি edit বা pull request-ও করা যায়।</li></ol><p>Real credentials, secret, URL path, payload ও exploit instructions public CSV-তে লিখবেন না।</p></section>
+  <section class="content" id="instructions" hidden><h2>📖 নির্দেশনা</h2><ol><li>Course lead থেকে assigned domain, website এবং লিখিত অনুমতি নিশ্চিত করুন।</li><li>নিজের GitHub ID দিয়ে লগইন করুন; আলাদা repository access লাগে না।</li><li>নতুন Entry-তে domain ও website-এর শুধু hostname, task, চেষ্টা, ফলাফল, তারিখ এবং নিরাপদ সারাংশ লিখুন। ব্যর্থ হলেও entry দিন।</li><li>Submit-এর পর dashboard ও GitHub-এর <code>domains/[domain]/findings.csv</code> দেখুন। GitHub-এ হাতে edit করলে fork ও pull request পাঠান।</li></ol><p>Real credentials, secret, URL path, payload ও exploit instructions public CSV-তে লিখবেন না।</p></section>
   <section class="content" id="faq" hidden><h2>❓ FAQ</h2><h3>Data কোথায় থাকে?</h3><p>প্রতিটি assigned domain-এর জন্য GitHub-এর <code>domains/example.org/findings.csv</code> ফাইলে; website hostname-গুলো সেই CSV-তে row হিসেবে থাকে। আগের country lab data আলাদা ফাইলে সংরক্ষিত।</p><h3>ব্যর্থ চেষ্টা রাখা যাবে?</h3><p>হ্যাঁ। Attempted “হ্যাঁ”, Outcome “ব্যর্থ” নির্বাচন করুন এবং নিরাপদ সারাংশ লিখুন।</p><h3>ভুল entry সংশোধন?</h3><p>GitHub contributor হিসেবে সংশ্লিষ্ট CSV edit করে commit বা pull request দিন।</p></section>
-  <section class="content" id="github" hidden><h2>🐙 GitHub গাইড</h2><p>Repository-র <code>CONTRIBUTING.md</code> অনুযায়ী browser edit বা branch + pull request দিয়ে contribution করুন। Site form-এ নিজের GitHub ID দিয়ে sign in করুন; repository-তে write permission থাকতে হবে।</p><p><a href="https://github.com/mdnhbn/AWS-66-Delta-Shell-Upload-Project">GitHub repository খুলুন</a></p></section>
+  <section class="content" id="github" hidden><h2>🐙 GitHub গাইড</h2><p>Repository-র <code>CONTRIBUTING.md</code> অনুযায়ী সংশ্লিষ্ট <code>domains/[domain]/findings.csv</code> ফাইল খুলুন, edit করুন এবং pull request পাঠান। মূল repository-তে write permission না থাকলে GitHub নিজের fork তৈরি করার সুযোগ দেয়; PR অনুমোদন হলে এন্ট্রি dashboard-এ আসবে। Site form-এ GitHub login করেই entry দিতে পারবেন।</p><p><a href="https://github.com/mdnhbn/AWS-66-Delta-Shell-Upload-Project">GitHub repository খুলুন</a></p></section>
   <footer>AWS 66 — Delta • Authorized course task tracking</footer>
 </div>
 <script>
@@ -60,7 +60,7 @@ async function refresh(){
 async function refreshAuth(){
   try{
     const response=await fetch('/api/auth?mode=session',{cache:'no-store'});const data=await response.json();
-    $('auth-status').textContent=data.authenticated?`GitHub-এ লগইন: ${data.login}`:'Entry দিতে নিজের GitHub ID দিয়ে লগইন করুন। Repository-তে contributor access প্রয়োজন।';
+    $('auth-status').textContent=data.authenticated?`GitHub-এ লগইন: ${data.login}`:'Entry দিতে নিজের GitHub ID দিয়ে লগইন করুন। আলাদা repository access লাগে না।';
     $('entry-form').hidden=!data.authenticated;$('login-link').hidden=Boolean(data.authenticated);$('logout-button').hidden=!data.authenticated;
   }catch{$('auth-status').textContent='GitHub sign-in status পাওয়া যায়নি';}
 }

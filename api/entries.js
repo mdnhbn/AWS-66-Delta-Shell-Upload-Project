@@ -94,13 +94,17 @@ export default async function handler(req, res) {
   if (!sameOrigin(req)) return res.status(403).json({ error: 'Invalid origin' });
   const actor = session(req);
   if (!actor) return res.status(401).json({ error: 'Sign in with GitHub to contribute' });
+  // The server writes the CSV; the signed-in account is recorded in its Contributor column.
+  // This allows classmates to submit without repository write permission.
+  const writerToken = process.env.GITHUB_TOKEN;
+  if (!writerToken) return res.status(503).json({ error: 'GitHub submission is not configured' });
   try {
     if (Number(req.headers['content-length'] || 0) > 4096) return res.status(413).json({ error: 'Entry too large' });
     const entry = validate({ ...req.body, Contributor: actor.login });
     const path = `domains/${encodeURIComponent(entry.Domain)}/findings.csv`;
     for (let attempt = 0; attempt < 3; attempt++) {
       let file, current;
-      try { file = await github(path, {}, actor.token); current = decode(file); }
+      try { file = await github(path, {}, writerToken); current = decode(file); }
       catch (error) { if (error.status !== 404) throw error; current = csvLine(HEADERS); }
       if (entries(current).some(e => e.Website === entry.Website && e.Task === entry.Task && e.Date === entry.Date && e.Contributor === entry.Contributor))
         return res.status(409).json({ error: 'This website/task/date/contributor entry already exists' });
@@ -109,12 +113,12 @@ export default async function handler(req, res) {
         await github(path, { method: 'PUT', body: JSON.stringify({
           message: `[${entry.Domain}] ${actor.login} records ${entry.Website} outcome`,
           content: Buffer.from(next).toString('base64'), ...(file ? { sha: file.sha } : {})
-        }), headers: { 'Content-Type': 'application/json' } }, actor.token);
+        }), headers: { 'Content-Type': 'application/json' } }, writerToken);
         return res.status(201).json({ entry });
       } catch (error) { if (![409, 422].includes(error.status) || attempt === 2) throw error; }
     }
   } catch (error) {
-    if (error.status === 403 || error.status === 404) return res.status(403).json({ error: 'Your GitHub account needs contributor access and the app must be installed for this repository' });
+    if (error.status === 401 || error.status === 403 || error.status === 404) return res.status(503).json({ error: 'GitHub submission is temporarily unavailable. Please try again later.' });
     if (error.status) return res.status(502).json({ error: 'GitHub write failed' });
     return res.status(400).json({ error: error.message });
   }
