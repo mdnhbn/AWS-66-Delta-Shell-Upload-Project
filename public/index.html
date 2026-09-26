@@ -42,12 +42,14 @@ document.querySelectorAll('nav button').forEach(button=>button.addEventListener(
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b===button));
   document.querySelectorAll('section.content').forEach(s=>s.hidden=s.id!==button.dataset.section);
 }));
-async function refresh(){
+async function refresh(recentEntry){
   $('load-message').textContent='GitHub data loading…';
   try{
     const response=await fetch('/api/entries',{cache:'no-store'});const data=await response.json();
     if(!response.ok)throw Error(data.error||'Could not load entries');
-    const entries=data.entries||[];$('total').textContent=entries.length;
+    const entries=[...(data.entries||[])];
+    if(recentEntry&&!entries.some(e=>e.Domain===recentEntry.Domain&&e.Website===recentEntry.Website&&e.Task===recentEntry.Task&&e.Date===recentEntry.Date&&e.Contributor===recentEntry.Contributor))entries.unshift(recentEntry);
+    $('total').textContent=entries.length;
     $('success').textContent=entries.filter(e=>e.Outcome==='success').length;
     $('unsuccessful').textContent=entries.filter(e=>e.Outcome==='unsuccessful').length;
     $('progress').textContent=entries.filter(e=>e.Outcome==='in-progress').length;
@@ -72,7 +74,7 @@ $('entry-form').addEventListener('submit',async event=>{
   try{
     const response=await fetch('/api/entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)});
     const data=await response.json();if(!response.ok)throw Error(data.error||'Submission failed');
-    form.reset();$('form-message').textContent='Entry saved to GitHub.';await refresh();
+    form.reset();$('form-message').textContent='Entry saved to GitHub.';await refresh(data.entry);
   }catch(error){$('form-message').textContent=error.message}finally{button.disabled=false}
 });
 refresh();refreshAuth();

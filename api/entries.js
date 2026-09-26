@@ -51,6 +51,13 @@ async function github(path, options = {}, userToken = '') {
   }
   return body;
 }
+async function readGithub(path, token) {
+  try { return await github(path, {}, token); }
+  catch (error) {
+    if (token && [401, 403].includes(error.status)) return github(path);
+    throw error;
+  }
+}
 function decode(file) { return Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8'); }
 function hostname(value) {
   return value.length <= 253 && value.includes('.') && value.split('.').every(label =>
@@ -80,12 +87,14 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'GET') {
     try {
-      const directory = await github('domains');
+      // Authenticated GitHub reads avoid stale anonymous directory caches right after a new domain is created.
+      const readToken = process.env.GITHUB_TOKEN || '';
+      const directory = await readGithub('domains', readToken);
       if (!Array.isArray(directory)) throw new Error('Missing domain directory');
       const siteNames = directory.filter(item => item.type === 'dir' && hostname(item.name) && !COUNTRIES.includes(item.name)).map(item => item.name);
       const [siteRows, legacyRows] = await Promise.all([
-        Promise.all(siteNames.map(async domain => entries(decode(await github(`domains/${encodeURIComponent(domain)}/findings.csv`))))),
-        Promise.all(COUNTRIES.map(async country => entries(decode(await github(`domains/${country}/findings.csv`)), LEGACY_HEADERS)))
+        Promise.all(siteNames.map(async domain => entries(decode(await readGithub(`domains/${encodeURIComponent(domain)}/findings.csv`, readToken))))),
+        Promise.all(COUNTRIES.map(async country => entries(decode(await readGithub(`domains/${country}/findings.csv`, readToken)), LEGACY_HEADERS)))
       ]);
       return res.status(200).json({ entries: siteRows.flat(), legacyEntries: legacyRows.flat() });
     } catch { return res.status(503).json({ error: 'Could not load GitHub data' }); }
