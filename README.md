@@ -1,25 +1,28 @@
-# AWS 66 Delta — authorized lab findings
+# AWS 66 Delta — authorized course task tracker
 
-বাংলা ও English team dashboard for documenting **authorized training labs**. The dashboard reads country CSV files from GitHub; approved contributors can submit entries through the Vercel API. GitHub remains the source of truth.
+বাংলা ও English dashboard for recording **authorized course assignments by domain and website hostname**. Contributors record attempts whether successful, unsuccessful, still in progress, or not attempted. GitHub CSV files are the source of truth; the Vercel form commits to the same files.
 
-## Scope
+## Scope and data
 
-Only use intentionally vulnerable training labs or systems for which the team has written authorization. Public files must not contain real credentials, shell URLs, payloads, exploit instructions, personal data or identifiable production targets. Use an opaque lab ID rather than a live URL. Redact evidence before sharing it.
+Only record websites included in the team's written authorization. The public repository lists hostnames and generic task outcomes. Do not add credentials, URL paths, shell URLs, payloads, exploit instructions, personal data, or sensitive evidence. If a target hostname is confidential, do not enter it in this public repository.
+
+Each domain has `domains/<domain>/findings.csv`, for example `domains/example.org/findings.csv`. The `Website` field is the exact hostname (`example.org` or `app.example.org`) within the assigned domain. The header is:
+
+```csv
+Domain,Website,Task,Attempted,Outcome,Date,Details,Contributor
+```
+
+`Attempted` is `yes` or `no`; `Outcome` is `success`, `unsuccessful`, `in-progress`, or `not-attempted`. `no` must pair with `not-attempted`. The form creates the domain file on the first entry. Each later entry adds a row. The previous `domains/{india,pakistan,uganda,canada,others}/findings.csv` files remain readable in the dashboard's earlier lab section.
 
 ## Repository layout
 
-- `public/index.html`: dashboard and submission form.
-- `api/entries.js`: GitHub backed list and submission API.
-- `domains/{india,pakistan,uganda,canada,others}/findings.csv`: CSV data.
-- `CONTRIBUTING.md`: browser and CLI contribution guide.
+- `public/index.html`: dashboard, instructions and visual entry form.
+- `api/entries.js`: GitHub-backed list and submission API.
+- `domains/<domain>/findings.csv`: task entries grouped by assigned domain.
+- `CONTRIBUTING.md`: direct GitHub edit and pull request guide.
 
 ## Vercel setup
 
-1. Import this repository into Vercel. Framework preset: **Other**; root directory: repository root.
-2. Create a fine-grained GitHub token scoped to this repository with **Contents: Read and write**. Store it as `GITHUB_TOKEN` in Vercel environment variables, never in GitHub or the browser.
-3. Set a long random `SUBMISSION_KEY` in Vercel. `GITHUB_OWNER` and `GITHUB_REPO` default to this repository but may be overridden. Share the submission key only with trusted contributors. Rotate it if exposed.
-4. Deploy. Open `/` and verify that the empty dashboard loads. Send a safe test entry and confirm it appears in the corresponding CSV and on refresh.
+Production uses `GITHUB_TOKEN` (fine-grained token for this repository, Contents read/write) and `SUBMISSION_KEY` as Secret environment variables. `GITHUB_OWNER` and `GITHUB_REPO` default to this repository. Redeploy after any environment variable change. Share the submission key only with trusted contributors; rotate it if exposed. A public repository can be read without the token.
 
-The GET API reads public repository CSV files from GitHub and works without secrets. The POST API requires `GITHUB_TOKEN` and `SUBMISSION_KEY`, validates fields, rejects duplicates and retries commit conflicts. For a private repository, `GITHUB_TOKEN` is also required for reads. The token is never returned to clients.
-
-Direct GitHub edits and pull requests remain available. Avoid putting secrets in issue bodies, screenshots, commit messages, or Git history.
+The POST API validates hostnames, statuses and dates, rejects duplicate website/task/date/contributor entries, and retries GitHub commit conflicts. Direct GitHub edits and pull requests are also supported. Follow the exact CSV header and keep hostnames within the domain folder. The dashboard reads domain folders from GitHub on refresh.
